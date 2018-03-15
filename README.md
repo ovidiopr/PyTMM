@@ -1,44 +1,50 @@
-# PyTMM
-Transfer Matrix Method implementation &amp; RefractiveIndex.info database (2015-05-24) browser
+# tmmnlay
+Cython implementarion of the Transfer Matrix Method
 
-## Documentation
-Extended documentation can be found at  [kitchenknif.github.io/PyTMM](https://kitchenknif.github.io/PyTMM)
+This extension implements the Transfer Matrix Method, which is
+used in optics and acoustics to analyze the propagation of
+electromagnetic or acoustic waves through a multilayer medium.
 
+## Credits
+tmmnlay has been forked from [PyTMM](https://kitchenknif.github.io/PyTMM).
 
-## Installation &amp; Basic Usage
-By default the RefractiveIndex module thinks that it is installed side-by-side with the RefractiveIndex.info database:
+# Using tmmnlay
 
-    .
-    +-- _PyTMM
-    |   +-- refractiveIndex.py
-    +-- RefractiveIndex
-    |   +-- library.yml
+## Compiling the Code:
+To compile the Cython extension you need Cython, a C compiler, [NumPy](http://www.numpy.org/):
 
+ - **cython (>=0.23.4)**
+ - **python-numpy (>= 1.0.3)**
+ - **python-scipy (>=0.5.2)**
+ - **python-all-dev (any version)**
+ - **python-numpy-dev (any version)**
 
-In this case, the database can be used as follows:
+And to compile the Debian package you need some additional tools:
 
-    catalog = RefractiveIndex()
-    mat = catalog.getMaterial('main', 'Si', 'Aspnes')
-    # wavelength in nanometers
-    n = mat.getRefractiveIndex(500))
-    n = mat.getExtinctionCoefficient(500))
+ - **debhelper (>=7.0.0)**
+ - **dh-python (any version)**
+ - **cdbs (>= 0.4.49)**
 
-If your folder structure is different, you just need to specify the path to the RefractiveIndex database:
+Compilation options
 
-    catalog = RefractiveIndex("./path/to/folder/with/RefractiveIndex/database")
-    mat = catalog.getMaterial('main', 'Si', 'Aspnes')
-    n = mat.getRefractiveIndex(500))  # wavelength in nanometers
+ - **make source** - Create source package for Cython extension
+ - **make install** - Install Cython extension on local system
+ - **make ext** - Create Cython extension in place
+ - **make deb** - Generate a deb package for Cython extension
+ - **make rpm** - Generate a rpm package for Cython extension
+ - **make clean** - Delete temporal files
 
+## Using tmmnlay
+  
+  ```python
+from tmmnlay import TransferMatrix, solvePropagation
+...
+a = TransferMatrix.boundingLayer(1, n1)
 
-Examples of using the transferMatrix module can be found in
+R, T = solvePropagation(a)
+...
+  ```
 
-    .
-    +-- _PyTMM
-    |   +-- examples
+## License
 
-
-## Dependencies
-- numpy
-- scipy
-- pyyaml
-- matplotlib (for plotting)
+GPL v3+
