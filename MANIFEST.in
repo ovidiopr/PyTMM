@@ -1,0 +1,7 @@
+include COPYING.TXT
+include LICENSE.TXT
+include README.md
+include MANIFEST.in
+include Makefile
+include debian/*
+
