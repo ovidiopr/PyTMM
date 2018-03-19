@@ -24,30 +24,28 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tmmnlay import *
+from tmmnlay import MultiLayer
 
-n = 2
-d = 600  # slab thickness, nm
+n = 1.5
 l = 500  # wavelength, nm
-ran = np.linspace(0, np.pi/2, 1000)
+aoi = np.linspace(0, 89.9, 1000)
 TE = []
 TM = []
-for i in ran:
+a = MultiLayer(n=(1.0, n), d=(0.0, 0.0), wvl=l)
+for a.aoi in aoi:
+    #print a.aoi, a._aoi, a._sin2
     # TE
-    a = TransferMatrix.layer(n, d, l, i, Polarization.s)
-
-    R, T = solvePropagation(a)
+    R, T = a.rt_TE
     TE.append(np.abs(R**2))
 
     # TM
-    a = TransferMatrix.layer(n, d, l, i, Polarization.p)
-    R, T = solvePropagation(a)
+    R, T = a.rt_TM
     TM.append(np.abs(R**2))
 
 
-plt.plot(ran, TE)
-plt.plot(ran, TM)
-plt.xlabel("Angle, rad")
+plt.plot(aoi, TE)
+plt.plot(aoi, TM)
+plt.xlabel("Angle, deg")
 plt.ylabel("Reflectance")
 plt.title("Angle dependence of reflectivity")
 plt.legend(['TE', 'TM'], loc='best')

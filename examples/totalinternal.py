@@ -24,28 +24,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tmmnlay import *
+from tmmnlay import MultiLayer
 
-n = 2
-aoi = np.linspace(0, np.pi/2, 1000)
+aoi = np.linspace(0, 89.9, 1000)
 TE = []
 TM = []
-for i in aoi:
+# Wavelength is not important if both layers are seminfinite
+a = MultiLayer(n=(1.0, 2.0), d=(0.0, 0.0), wvl=1)
+for a.aoi in aoi:
     # TE
-    a = TransferMatrix.boundingLayer(n, 1, i, Polarization.s)
-
-    R, T = solvePropagation(a)
+    R, T = a.rt_TE
     TE.append(np.abs(R**2))
 
     # TM
-    a = TransferMatrix.boundingLayer(n, 1, i, Polarization.p)
-    R, T = solvePropagation(a)
+    R, T = a.rt_TM
     TM.append(np.abs(R**2))
 
 
 plt.plot(aoi, TE)
 plt.plot(aoi, TM)
-plt.xlabel("Angle, rad")
+plt.xlabel("Angle, deg")
 plt.ylabel("Reflectance")
 plt.title("Angle dependence of reflectivity")
 plt.legend(['TE', 'TM'], loc='best')

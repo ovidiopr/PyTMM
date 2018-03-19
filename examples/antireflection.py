@@ -24,29 +24,23 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tmmnlay import *
+from tmmnlay import MultiLayer
 
 n1 = 1.5
 n2 = np.sqrt(n1)
 d = 700 / (n2 * 4)     # quarter-wavelength coating
 
 ran = range(200, 1600, 1)
-refl0 = []
-refl = []
-for i in ran:
-    # substrate layer (considered infinite, so only bounding layer needed)
-    a = TransferMatrix.boundingLayer(1, n1)
 
-    R, T = solvePropagation(a)
-    refl0.append(np.abs(R**2))
+# substrate layer (considered infinite, so only bounding layer needed)
+a = MultiLayer(n=(1.0, n1), d=(0.0, 0.0), wvl=ran)
+r, t = a.rt_TE
+refl0 = np.abs(r**2)
 
-    # antireflective layer layer "left" of substrate
-    b = TransferMatrix.layer(n2, d, i)
-    a.appendRight(b)
-
-    R, T = solvePropagation(a)
-    refl.append(np.abs(R**2))
-
+# antireflective layer layer "left" of substrate
+b = MultiLayer(n=(1.0, n2, n1), d=(0.0, d, 0.0), wvl=ran)
+r, t = b.rt_TE
+refl = np.abs(r**2)
 
 plt.plot(ran, refl0)
 plt.plot(ran, refl)

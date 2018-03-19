@@ -20,9 +20,6 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
-
-
 import numpy as np
 from enum import Enum
 
@@ -32,203 +29,334 @@ class Polarization(Enum):
     p = 1
 
 
-class TransferMatrix:
+class MultiLayer(object):
     """
-        Dielectric layer TMM
+        MultiLayer TMM
 
-        How the functions eat structure matricies:
+        Problem geometry:
 
-        | T |   |        | |        | |     |   | 1 |
-        |   | = | Bottom | | Matrix | | Top | = |   |
-        | 0 |   |        | |        | |     |   | R |
+        | 1 |   |      | |    | |      |     |    | |          |   | T |
+        |   | = | I_01 | | L1 | | I_12 | ... | Ln | | I_n(n+1) | = |   |
+        | R |   |      | |    | |      |     |    | |          |   | 0 |
+
+        In addition
 
     """
-
-    @staticmethod
-    def structure(*args):
+    def __init__(self, n, d, wvl, aoi=0.0):
         """
-        args - separate structure matricies
-        Left to Right = Bottom to Top
-        :param args:
+        Initialize a MultiLayer class.
+        
+        Description:
+          This class contains the functions needed to solve the wave
+          propagation in a multilayer structure.
+          
+        Inputs:
+          n -- A 2D array of possibly complex values for the index of
+               refraction of the layers. The first dimension is for the
+               wavelengths and the second for the layers
+          d -- A 1D array of thickness for all layers. d[0] and d[-1]
+               (corresponding to the outer semi-infinite layers) will be
+               set to zero, regardless of whatever value they have before you
+               pass the array to this class.  If you don't want this done to
+               your array, make a copy first. (units must match that of the 
+               wavelength)
+          wvl -- A 1D array of wavelength (units must match that of the
+               thickness)
+          aoi -- Angle of incidence (in degrees)
         """
-        mat = np.identity(2, dtype=np.complex128)
-        for m in args:
-            mat = np.dot(m.matrix, mat)
-        return TransferMatrix(mat)
+        # Make sure that the list of refractive indexes is a numpy array
+        if type(n) is np.ndarray:
+            self._n = n
+        elif type(n) in (int, float, complex):
+            self._n = np.array([n])
+        else:
+            self._n = np.array(n)
 
-    @staticmethod
-    def layer(n, d, wavelength, theta=0, pol=Polarization.s):
+        # Make sure that the list of thicknesses is a numpy array
+        if type(d) is np.ndarray:
+            self._d = d
+        elif type(d) in (int, float, complex):
+            self._d = np.array([d])
+        else:
+            self._d = np.array(d)
+        # Enforce this requirement for the outer layers
+        self._d[0] = self._d[-1] = 0.0
+
+        # Make sure that the list of wavelengths is a numpy array
+        if type(wvl) is np.ndarray:
+            self._wvl = wvl
+        elif type(wvl) in (int, float, complex):
+            self._wvl = np.array([wvl])
+        else:
+            self._wvl = np.array(wvl)
+
+        # If n is an 1D array then assume that it is constant
+        # then, we repeat the values for all wavelengths
+        if len(self._n.shape) == 1:
+            ln = self._n.shape[0]
+            lw = self._wvl.shape[0]
+            self._n = np.tile(self._n, lw).reshape((lw, ln))
+
+        self._aoi = aoi
+        self._sin2 = np.sin(self._aoi*np.pi/180.0)**2.0
+
+        # Make sure that the problem is well defined
+        assert self._d.shape[0] >= 2, "We need at least two layers (%i found)" % (self._d.shape[0])
+        assert self._n.shape[0] == self._wvl.shape[0],\
+            "The number of refractive index values (%i) does not match the number of wavelengths (%i)"\
+            % (self._n.shape[0], self._wvl.shape[0])
+        assert self._n.shape[1] == self._d.shape[0],\
+            "The number of refractive index values (%i) does not match the number of layers (%i)"\
+            % (self._n.shape[1], self._d.shape[0])
+
+        self._im = self._lm = None
+        self._matrix_TE = self._matrix_TM = None
+        self._coeffi_TE = self._coeffi_TE = None
+
+    @property
+    def n(self):
+        """Returns the refractive index values."""
+        return self._n
+
+    @n.setter
+    def n(self, value):
+        """Updates the refractive index values."""
+        if type(value) is np.ndarray:
+            self._n = value
+        elif type(value) in (int, float, complex):
+            self._n = np.array([value])
+        else:
+            self._n = np.array(value)
+
+        # If n is an 1D array then we repeat the values for all wavelengths
+        if len(self._n.shape) == 1:
+            ln = self._n.shape[0]
+            lw = self._wvl.shape[0]
+            self._n = np.tile(self._n, lw).reshape((lw, ln))
+
+        self._im = self._lm = None
+        self._matrix_TE = self._matrix_TM = None
+        self._coeffi_TE = self._coeffi_TE = None
+
+    @property
+    def d(self):
+        """Returns the thickness values."""
+        return self._d
+
+    @d.setter
+    def d(self, value):
+        """Updates the thickness values."""
+        if type(value) is np.ndarray:
+            self._d = value
+        elif type(value) in (int, float, complex):
+            self._d = np.array([value])
+        else:
+            self._d = np.array(value)
+        # Enforce this requirement for the outer layers
+        self._d[0] = self._d[-1] = 0.0
+
+        self._im = self._lm = None
+        self._matrix_TE = self._matrix_TM = None
+        self._coeffi_TE = self._coeffi_TE = None
+
+    @property
+    def wvl(self):
+        """Returns the wavelength values."""
+        return self._wvl
+
+    @wvl.setter
+    def wvl(self, value):
+        """Updates wavelength values."""
+        if type(value) is np.ndarray:
+            self._wvl = value
+        elif type(value) in (int, float, complex):
+            self._wvl = np.array([value])
+        else:
+            self._wvl = np.array(value)
+
+        self._im = self._lm = None
+        self._matrix_TE = self._matrix_TM = None
+        self._coeffi_TE = self._coeffi_TE = None
+
+    @property
+    def aoi(self):
+        """Returns the angle of incidence (degrees)."""
+        return self._aoi
+
+    @aoi.setter
+    def aoi(self, value):
+        """Updates the angle of incidence (degrees)."""
+        self._aoi = value
+        self._sin2 = np.sin(self._aoi*np.pi/180.0)**2.0
+
+        self._im = self._lm = None
+        self._matrix_TE = self._matrix_TM = None
+        self._coeffi_TE = self._coeffi_TE = None
+
+    @property
+    def num_layers(self):
+        """Returns the number of layers."""
+        return self._d.shape[0]
+
+    @property
+    def num_lambda(self):
+        """Returns the number of wavelength values."""
+        return self._wvl.shape[0]
+
+    @property
+    def interface_matrices(self):
         """
-        Creates a Air-DielectricLayer-Air Transfer Matrix
-        :param n:
-        :param d:
-        :param wavelength:
+        Calculates (only if necessary) and returns the interface matrices.
+        To save memory it only saves the rjk and tjk coefficients corresponding
+        to the TE (s) and TM (p) polarizations.
         """
-        bottomBoundary = TransferMatrix.boundingLayer(1, n, theta, pol)
-        topBoundary = TransferMatrix.boundingLayer(n, 1, theta, pol)
-        propagation = TransferMatrix.propagationLayer(n, d, wavelength, theta, pol)
+        # Make sure that the problem is well defined
+        assert self._d.shape[0] >= 2, "We need at least two layers (%i found)" % (self._d.shape[0])
+        assert self._n.shape[0] == self._wvl.shape[0],\
+            "The number of refractive index values (%i) does not match the number of wavelengths (%i)"\
+            % (self._n.shape[0], self._wvl.shape[0])
+        assert self._n.shape[1] == self._d.shape[0],\
+            "The number of refractive index values (%i) does not match the number of layers (%i)"\
+            % (self._n.shape[1], self._d.shape[0])
 
-        return TransferMatrix.structure(bottomBoundary, propagation, topBoundary)
+        if self._im is None:
+            n2 = self.n**2.0
+            n2j = n2[:, :-1]
+            n2k = n2[:, 1:]
 
-    @staticmethod
-    def boundingLayer(n1, n2, theta=0, pol=Polarization.s):
+            q = np.sqrt(n2 - (n2[:, 0]*self._sin2)[:, None])
+            qj = q[:, :-1]
+            qk = q[:, 1:]
+
+            num1 = qj + qk
+            num2 = n2k*qj + n2j*qk
+
+            self._im = np.zeros((self.num_lambda, self.num_layers - 1, 4), dtype=complex)
+            # rjk for the TE (s) polarization
+            self._im[:, :, 0] = (qj - qk)/num1
+            # tjk for the TE (s) polarization
+            self._im[:, :, 1] = 2.0*qj/num1
+            # rjk for the TM (p) polarization
+            self._im[:, :, 2] = (n2k*qj - n2j*qk)/num2
+            # tjk for the TM (p) polarization
+            self._im[:, :, 3] = 2.0*self.n[:, :-1]*self.n[:, 1:]*qj/num2
+
+        return self._im
+
+    @property
+    def layer_matrices(self):
         """
-        Creates a DielectricLayer-DielectricLayer Boundary Transfer Matrix
-        :param n1:
-        :param n2:
+        Calculates (only if necessary) and returns the layer matrices.
+        To save memory it only saves the values of exp(-i*beta_j) and
+        exp(i*beta_j).
         """
-        # if np.abs((n1/n2)*np.sin(theta)) >= 1.0:
-        #     theta2 = np.pi/2*np.sign(np.sin(theta))
-        # else:
-        theta2 = np.arcsin((n1/n2)*np.sin(theta), dtype=np.complex128)
+        # Make sure that the problem is well defined
+        assert self._d.shape[0] >= 2, "We need at least two layers (%i found)" % (self._d.shape[0])
+        assert self._n.shape[0] == self._wvl.shape[0],\
+            "The number of refractive index values (%i) does not match the number of wavelengths (%i)"\
+            % (self._n.shape[0], self._wvl.shape[0])
+        assert self._n.shape[1] == self._d.shape[0],\
+            "The number of refractive index values (%i) does not match the number of layers (%i)"\
+            % (self._n.shape[1], self._d.shape[0])
 
-        # TE
-        if pol is Polarization.s:
-            _n1 = n1*np.cos(theta)
-            _n2 = n2*np.cos(theta2)
-            a21 = 1
+        if (self._lm is None) and (self.num_layers > 2):
+            n2 = self.n**2.0
 
-        # TM
-        elif pol is Polarization.p:
-            _n1 = n1/np.cos(theta)
-            _n2 = n2/np.cos(theta2)
-            a21 = np.cos(theta2)/np.cos(theta)
+            q = np.sqrt(n2 - (n2[:, 0]*self._sin2)[:, None])
+            qj = q[:, 1:-1]
 
-        boundary = 1/(2*a21*_n2)*np.array([[(_n1 + _n2), (_n2 - _n1)],
-                                    [(_n2 - _n1), (_n1 + _n2)]], dtype=np.complex128)
-        return TransferMatrix(boundary)
+            Bj = 2.0j*np.pi*qj*self.d[1:-1, None]/self.wvl[:, None]
 
-    @staticmethod
-    def propagationLayer(n, d, wavelength, theta=0, pol=Polarization.s):
+            self._lm = np.zeros((self.num_lambda, self.num_layers - 2, 2), dtype=complex)
+            # exp(-i*beta_j)
+            self._lm[:, :, 0] = np.exp(-Bj)
+            # exp(i*beta_j)
+            self._lm[:, :, 1] = np.exp(Bj)
+
+        return self._lm
+
+    @property
+    def matrix_TE(self):
         """
-        Creates a Propagation Transfer Matrix, width d, refractive index n
-        :param n:
-        :param d:
-        :param wavelength:
+        Calculate total TE matrix for the multilayer
         """
-        theta2 = np.arcsin((1/n)*np.sin(theta), dtype=np.complex128)
+        if self._matrix_TE is None:
+            lm = self.layer_matrices
+            im = self.interface_matrices
 
-        propagation = np.array([[np.exp((-1j*n*d*2*np.pi/wavelength)*np.cos(theta2)), 0],
-                                [0, np.exp((1j*n*d*2*np.pi/wavelength)*np.cos(theta2))]],
-                               dtype=np.complex128)
-        return TransferMatrix(propagation)
+            self._matrix_TE = np.zeros((self.num_lambda, 2, 2), dtype=complex)
 
-    def __init__(self, matrix):
-        self.matrix = matrix
+            self._matrix_TE[:, 0, 0] = self._matrix_TE[:, 1, 1] = 1.0/im[:, 0, 1]
+            self._matrix_TE[:, 0, 1] = self._matrix_TE[:, 1, 0] = im[:, 0, 0]/im[:, 0, 1]
 
-    def invert(self):
+            for j in range(1, self.num_layers - 1):
+                B11 = lm[:, j - 1, 0]/im[:, j, 1]
+                B12 = lm[:, j - 1, 0]*im[:, j, 0]/im[:, j, 1]
+                B21 = lm[:, j - 1, 1]*im[:, j, 0]/im[:, j, 1]
+                B22 = lm[:, j - 1, 1]/im[:, j, 1]
+
+                C11 = self._matrix_TE[:, 0, 0]*B11 + self._matrix_TE[:, 0, 1]*B21
+                C12 = self._matrix_TE[:, 0, 0]*B12 + self._matrix_TE[:, 0, 1]*B22
+                C21 = self._matrix_TE[:, 1, 0]*B11 + self._matrix_TE[:, 1, 1]*B21
+                C22 = self._matrix_TE[:, 1, 0]*B12 + self._matrix_TE[:, 1, 1]*B22
+
+                self._matrix_TE[:, 0, 0] = C11
+                self._matrix_TE[:, 0, 1] = C12
+                self._matrix_TE[:, 1, 0] = C21
+                self._matrix_TE[:, 1, 1] = C22
+
+        return self._matrix_TE
+
+    @property
+    def matrix_TM(self):
         """
-        Inverts matrix
-
+        Calculate total TM matrix for the multilayer
         """
-        self.matrix = np.linalg.inv(self.matrix)
+        if self._matrix_TM is None:
+            lm = self.layer_matrices
+            im = self.interface_matrices
 
-    def appendLeft(self, matrix):
+            self._matrix_TM = np.zeros((self.num_lambda, 2, 2), dtype=complex)
+
+            self._matrix_TM[:, 0, 0] = self._matrix_TM[:, 1, 1] = 1.0/im[:, 0, 3]
+            self._matrix_TM[:, 0, 1] = self._matrix_TM[:, 1, 0] = im[:, 0, 2]/im[:, 0, 3]
+
+            for j in range(1, self.num_layers - 1):
+                B11 = lm[:, j - 1, 0]/im[:, j, 3]
+                B12 = lm[:, j - 1, 0]*im[:, j, 2]/im[:, j, 3]
+                B21 = lm[:, j - 1, 1]*im[:, j, 2]/im[:, j, 3]
+                B22 = lm[:, j - 1, 1]/im[:, j, 3]
+
+                C11 = self._matrix_TM[:, 0, 0]*B11 + self._matrix_TM[:, 0, 1]*B21
+                C12 = self._matrix_TM[:, 0, 0]*B12 + self._matrix_TM[:, 0, 1]*B22
+                C21 = self._matrix_TM[:, 1, 0]*B11 + self._matrix_TM[:, 1, 1]*B21
+                C22 = self._matrix_TM[:, 1, 0]*B12 + self._matrix_TM[:, 1, 1]*B22
+
+                self._matrix_TM[:, 0, 0] = C11
+                self._matrix_TM[:, 0, 1] = C12
+                self._matrix_TM[:, 1, 0] = C21
+                self._matrix_TM[:, 1, 1] = C22
+
+        return self._matrix_TM
+
+    @property
+    def rt_TE(self):
         """
-
-        :param matrix:
         """
-        self.matrix = np.dot(matrix.matrix, self.matrix)
+        S = self.matrix_TE
+        r = S[:, 1, 0]/S[:, 0, 0]
+        t = 1.0/S[:, 0, 0]
+        #print r, t
 
-    def appendRight(self, matrix):
+        return r, t
+
+    @property
+    def rt_TM(self):
         """
-
-        :param matrix:
         """
-        self.matrix = np.dot(self.matrix, matrix.matrix)
+        S = self.matrix_TM
+        r = S[:, 1, 0]/S[:, 0, 0]
+        t = 1.0/S[:, 0, 0]
 
+        return r, t
 
-def solvePropagation(transferMatrix, incidentField=1.0):
-    """Calculate reflectance and transmittance
-    :param transferMatrix:
-    :param incidentField:
-    """
-    # res[1] = transmittance, res[0] = reflectance
-    lhs = np.array([[transferMatrix.matrix[0, 1], -1],
-                    [transferMatrix.matrix[1, 1], 0]])
-    rhs = np.array([-transferMatrix.matrix[0, 0], -transferMatrix.matrix[1, 0]])
-    rhs = np.multiply(rhs, incidentField)
-    res = np.linalg.solve(lhs, rhs)
-    reflectance = res[0]
-    transmittance = res[1]
-    return reflectance, transmittance
-
-
-def findReciprocalTransferMatrix(transmittance, reflectance, bottomMat=TransferMatrix(np.identity(2)),
-                                 topMat=TransferMatrix(np.identity(2))):  # , incidentField=1.0
-    """
-
-    :param transmittance:
-    :param reflectance:
-    :param bottomMat:
-    :param topMat:
-    :return:
-    """
-    assert transmittance != 0
-
-    matrix = np.array([[1/np.conj(transmittance), reflectance/transmittance],
-                       [np.conj(reflectance/transmittance), 1/transmittance]])
-    matrix = np.dot(np.linalg.inv(bottomMat.matrix), matrix)
-    matrix = np.dot(matrix, np.linalg.inv(topMat.matrix))
-    return TransferMatrix(matrix)
-
-
-def findReciprocalTransferMatrixLegacy(transmittance, reflectance, bottomMat=TransferMatrix(np.identity(2)),
-                                       topMat=TransferMatrix(np.identity(2))):  # , incidentField=1.0
-    """
-
-    :param transmittance:
-    :param reflectance:
-    :param bottomMat:
-    :param topMat:
-    :return:
-    """
-    a = np.identity(2)
-    b = np.array([[np.real(reflectance), np.imag(reflectance)],
-                  [np.imag(reflectance), -np.real(reflectance)]])
-    lhs = np.vstack((np.hstack((a, b)), np.hstack((b, a))))
-    rhs = np.array([np.real(transmittance), np.imag(transmittance), 0, 0])
-    res = np.linalg.solve(lhs, rhs)
-    matrix = np.array([[res[0] + 1j*res[1], res[2] - 1j*res[3]],
-                       [res[2] + 1j*res[3], res[0] - 1j*res[1]]])
-
-    matrix = np.dot(np.linalg.inv(bottomMat.matrix), matrix)
-    matrix = np.dot(matrix, np.linalg.inv(topMat.matrix))
-    return TransferMatrix(matrix)
-
-
-def findGeneralizedTransferMatrix(transmitance1, reflectance1, transmitance2, reflectance2,
-                                  bottomMat1=TransferMatrix(np.identity(2)),
-                                  topMat1=TransferMatrix(np.identity(2)),
-                                  bottomMat2=TransferMatrix(np.identity(2)),
-                                  topMat2=TransferMatrix(np.identity(2))):
-    """
-
-    :param transmitance1:
-    :param reflectance1:
-    :param transmitance2:
-    :param reflectance2:
-    :param bottomMat1:
-    :param topMat1:
-    :param bottomMat2:
-    :param topMat2:
-    :return:
-    """
-    a12 = np.dot(np.linalg.inv(bottomMat1.matrix), np.array([[transmitance1], [0]]))
-    a34 = np.dot(np.linalg.inv(bottomMat2.matrix), np.array([[transmitance2], [0]]))
-
-    b12 = np.dot(topMat1.matrix, np.array([[1], [reflectance1]]))
-    b34 = np.dot(topMat2.matrix, np.array([[1], [reflectance2]]))
-
-    rhs = np.array([a12[0, 0], a34[0, 0], a12[1, 0], a34[1, 0]])
-
-    bmat = np.array([[b12[0, 0], b12[1, 0]],
-                     [b34[0, 0], b34[1, 0]]])
-
-    lhs = np.vstack((np.hstack((bmat, np.zeros((2, 2)))),
-                     np.hstack((np.zeros((2, 2)), bmat))))
-    res = np.linalg.solve(lhs, rhs)
-
-    mat = np.array([[res[0], res[2]],
-                    [res[1], res[3]]])
-    return TransferMatrix(mat)

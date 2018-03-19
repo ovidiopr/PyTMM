@@ -26,23 +26,27 @@ import matplotlib.pyplot as plt
 
 from tmmnlay import MultiLayer
 
-wavelengths = np.linspace(200, 1500, 2000)
+n = 2.0
+d = 600  # slab thickness, nm
+l = 500  # wavelength, nm
+aoi = np.linspace(0, 89.9, 1000)
+TE = []
+TM = []
+a = MultiLayer(n=(1.0, n, 1.0), d=(0.0, d, 0.0), wvl=l)
+for a.aoi in aoi:
+    # TE
+    R, T = a.rt_TE
+    TE.append(np.abs(R**2))
 
-a = MultiLayer(n=(1.0, 1.46, 1.0), d=(0.0, 200.0, 0.0), wvl=wavelengths)
-R0 = np.abs(a.rt_TE[0])**2
+    # TM
+    R, T = a.rt_TM
+    TM.append(np.abs(R**2))
 
-a.n = (1.0, 1.46 + 0.001j, 1.0)
-R1 = np.abs(a.rt_TE[0])**2
 
-a.n = (1.0, 1.46 + 0.01j, 1.0)
-R2 = np.abs(a.rt_TE[0])**2
-
-a.n = (1.0, 1.46 + 0.1j, 1.0)
-R3 = np.abs(a.rt_TE[0])**2
-
-plt.plot(wavelengths, R0)
-plt.plot(wavelengths, R1)
-plt.plot(wavelengths, R2)
-plt.plot(wavelengths, R3)
-plt.legend(['1.46', '1.46+0.001j', '1.46+0.01j', '1.46+0.1j'], loc='best')
-plt.show()
+plt.plot(aoi, TE)
+plt.plot(aoi, TM)
+plt.xlabel("Angle, deg")
+plt.ylabel("Reflectance")
+plt.title("Angle dependence of reflectivity")
+plt.legend(['TE', 'TM'], loc='best')
+plt.show(block=True)
