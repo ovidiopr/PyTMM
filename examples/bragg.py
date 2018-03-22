@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 #
-#    Copyright (C) 2014-2015 Pavel Dmitriev <pavel.a.dmitriev@gmail.com>
 #    Copyright (C) 2018 Ovidio Peña Rodríguez <ovidio@bytesfall.com>
 #
 #    This file is part of tmmnlay
-#
-#    tmmnlay was forked from PyTMM, which was developed by Pavel Dmitriev
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -26,26 +23,33 @@ import matplotlib.pyplot as plt
 
 from tmmnlay import MultiLayer
 
-n = 1.5
-l = 500  # wavelength, nm
-aoi = np.linspace(0, 89.9, 1000)
-TE = []
-TM = []
-a = MultiLayer(n=(1.0, n), d=(0.0, 0.0), wvl=l)
-for a.aoi in aoi:
-    # TE
-    R, T = a.rt_TE
-    TE.append(np.abs(R**2))
+p = 20
+n1 = 2.5
+n2 = 1.5
+# Create multilayer structure
+n = np.tile(np.array((n1, n2)), p)
+n = np.insert(n, 0, 1.0)
+n = np.append(n, 1.0)
+d = np.tile(np.array((800.0/4./n1, 800.0/4.0/n2)), p)
+d = np.insert(d, 0, 0.0)
+d = np.append(d, 0.0)
+l = np.linspace(600., 1200., 1201)
 
-    # TM
-    R, T = a.rt_TM
-    TM.append(np.abs(R**2))
+a = MultiLayer(n=n, d=d, wvl=l)
+
+# TE
+R, T = a.rt_TE
+TE = np.abs(R**2)
+
+# TM
+R, T = a.rt_TM
+TM = np.abs(R**2)
 
 
-plt.plot(aoi, TE)
-plt.plot(aoi, TM)
-plt.xlabel("Angle, deg")
+plt.plot(l, TE)
+plt.plot(l, TM)
+plt.xlabel("Wavelength, nm")
 plt.ylabel("Reflectance")
-plt.title("Angle dependence of reflectivity")
+plt.title("Reflectance of Bragg mirror")
 plt.legend(['TE', 'TM'], loc='best')
 plt.show(block=True)

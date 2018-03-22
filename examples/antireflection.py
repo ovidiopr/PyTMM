@@ -14,7 +14,7 @@
 #    (at your option) any later version.
 #
 #    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    but WITHOUT ANY WARwavelengthTY; without even the implied warwavelengthty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
 #
@@ -28,22 +28,22 @@ from tmmnlay import MultiLayer
 
 n1 = 1.5
 n2 = np.sqrt(n1)
-d = 700 / (n2 * 4)     # quarter-wavelength coating
+d = 700./n2/4.     # quarter-wavelength coating
 
-ran = range(200, 1600, 1)
+wavelength = np.linspace(200, 1600, 1401)
 
-# substrate layer (considered infinite, so only bounding layer needed)
-a = MultiLayer(n=(1.0, n1), d=(0.0, 0.0), wvl=ran)
+# substrate layer
+a = MultiLayer(n=(1.0, n1), d=(0.0, 0.0), wvl=wavelength)
 r, t = a.rt_TE
 refl0 = np.abs(r**2)
 
 # antireflective layer layer "left" of substrate
-b = MultiLayer(n=(1.0, n2, n1), d=(0.0, d, 0.0), wvl=ran)
+b = MultiLayer(n=(1.0, n2, n1), d=(0.0, d, 0.0), wvl=wavelength)
 r, t = b.rt_TE
 refl = np.abs(r**2)
 
-plt.plot(ran, refl0)
-plt.plot(ran, refl)
+plt.plot(wavelength, refl0)
+plt.plot(wavelength, refl)
 plt.xlabel("Wavelength, nm")
 plt.ylabel("Reflectance")
 plt.title("Reflectance of ideal single-layer antireflective coating")

@@ -4,9 +4,16 @@ Cython implementarion of the Transfer Matrix Method
 This extension implements the Transfer Matrix Method, which is
 used in optics and acoustics to analyze the propagation of
 electromagnetic or acoustic waves through a multilayer medium.
+For details of the implementatio, check the details of the
+[algorithm](https://github.com/ovidiopr/tmmnlay/wiki/Algorithm).
 
 ## Credits
 tmmnlay has been forked from [PyTMM](https://kitchenknif.github.io/PyTMM).
+However, I have rewritten all the code from scratch in order to (i) increase
+the calculation speed and (ii) make it more 'Pythonic' (e.g., with the new code
+you can run the calculation for all wavelengths in a single step). In the process
+of rewriting it I have also implemented functionality that was missing in PyTMM,
+like the calculation of the electric field in the multilayer.
 
 # Using tmmnlay
 
@@ -15,7 +22,6 @@ To compile the Cython extension you need Cython, a C compiler, [NumPy](http://ww
 
  - **cython (>=0.23.4)**
  - **python-numpy (>= 1.0.3)**
- - **python-scipy (>=0.5.2)**
  - **python-all-dev (any version)**
  - **python-numpy-dev (any version)**
 
@@ -37,11 +43,10 @@ Compilation options
 ## Using tmmnlay
   
   ```python
-from tmmnlay import TransferMatrix, solvePropagation
+from tmmnlay import MultiLayer
 ...
-a = TransferMatrix.boundingLayer(1, n1)
-
-R, T = solvePropagation(a)
+b = MultiLayer(n=(1.0, n2, n1), d=(0.0, d, 0.0), wvl=wavelength)
+r, t = b.rt_TE
 ...
   ```
 

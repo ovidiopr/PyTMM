@@ -1,11 +1,8 @@
 # -*- coding: UTF-8 -*-
 #
-#    Copyright (C) 2014-2015 Pavel Dmitriev <pavel.a.dmitriev@gmail.com>
 #    Copyright (C) 2018 Ovidio Peña Rodríguez <ovidio@bytesfall.com>
 #
 #    This file is part of tmmnlay.
-#
-#    tmmnlay was forked from PyTMM, which was developed by Pavel Dmitriev
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -21,13 +18,8 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
-from enum import Enum
 
-
-class Polarization(Enum):
-    s = 0
-    p = 1
-
+(TE, TM) = range(2)
 
 class MultiLayer(object):
     """
@@ -44,16 +36,18 @@ class MultiLayer(object):
     """
     def __init__(self, n, d, wvl, aoi=0.0):
         """
-        Initialize a MultiLayer class.
+        Initialize the MultiLayer class.
         
         Description:
           This class contains the functions needed to solve the wave
           propagation in a multilayer structure.
           
         Inputs:
-          n -- A 2D array of possibly complex values for the index of
+          n -- A 1D or 2D array of possibly complex values for the index of
                refraction of the layers. The first dimension is for the
-               wavelengths and the second for the layers
+               wavelengths and the second for the layers. If the array is
+               1D  then assume that it is constantand repeat the values
+               for all wavelengths
           d -- A 1D array of thickness for all layers. d[0] and d[-1]
                (corresponding to the outer semi-infinite layers) will be
                set to zero, regardless of whatever value they have before you
@@ -61,57 +55,42 @@ class MultiLayer(object):
                your array, make a copy first. (units must match that of the 
                wavelength)
           wvl -- A 1D array of wavelength (units must match that of the
-               thickness)
+                 thickness)
           aoi -- Angle of incidence (in degrees)
         """
-        # Make sure that the list of refractive indexes is a numpy array
-        if type(n) is np.ndarray:
-            self._n = n
-        elif type(n) in (int, float, complex):
-            self._n = np.array([n])
-        else:
-            self._n = np.array(n)
-
-        # Make sure that the list of thicknesses is a numpy array
-        if type(d) is np.ndarray:
-            self._d = d
-        elif type(d) in (int, float, complex):
-            self._d = np.array([d])
-        else:
-            self._d = np.array(d)
-        # Enforce this requirement for the outer layers
-        self._d[0] = self._d[-1] = 0.0
-
-        # Make sure that the list of wavelengths is a numpy array
-        if type(wvl) is np.ndarray:
-            self._wvl = wvl
-        elif type(wvl) in (int, float, complex):
-            self._wvl = np.array([wvl])
-        else:
-            self._wvl = np.array(wvl)
-
-        # If n is an 1D array then assume that it is constant
-        # then, we repeat the values for all wavelengths
-        if len(self._n.shape) == 1:
-            ln = self._n.shape[0]
-            lw = self._wvl.shape[0]
-            self._n = np.tile(self._n, lw).reshape((lw, ln))
-
-        self._aoi = aoi
-        self._sin2 = np.sin(self._aoi*np.pi/180.0)**2.0
+        self.d = d
+        self.wvl = wvl
+        self.n = n
+        self.aoi = aoi
 
         # Make sure that the problem is well defined
-        assert self._d.shape[0] >= 2, "We need at least two layers (%i found)" % (self._d.shape[0])
-        assert self._n.shape[0] == self._wvl.shape[0],\
+        assert self.num_layers >= 2, "We need at least two layers (%i found)" % (self.num_layers)
+        assert self.num_lambda_n == self.num_lambda,\
             "The number of refractive index values (%i) does not match the number of wavelengths (%i)"\
-            % (self._n.shape[0], self._wvl.shape[0])
-        assert self._n.shape[1] == self._d.shape[0],\
+            % (self.num_lambda_n, self.num_lambda)
+        assert self.num_layers_n == self.num_layers,\
             "The number of refractive index values (%i) does not match the number of layers (%i)"\
-            % (self._n.shape[1], self._d.shape[0])
+            % (self.num_layers_n, self.num_layers)
 
-        self._im = self._lm = None
-        self._matrix_TE = self._matrix_TM = None
-        self._coeffi_TE = self._coeffi_TE = None
+    @property
+    def num_layers(self):
+        """Returns the number of layers."""
+        return self._d.shape[0]
+
+    @property
+    def num_lambda(self):
+        """Returns the number of wavelength values."""
+        return self._wvl.shape[0]
+
+    @property
+    def num_layers_n(self):
+        """Returns the number of layers."""
+        return self._n.shape[1]
+
+    @property
+    def num_lambda_n(self):
+        """Returns the number of wavelength values."""
+        return self._n.shape[0]
 
     @property
     def n(self):
@@ -128,7 +107,7 @@ class MultiLayer(object):
         else:
             self._n = np.array(value)
 
-        # If n is an 1D array then we repeat the values for all wavelengths
+        # If n is an 1D array we repeat the values for all wavelengths
         if len(self._n.shape) == 1:
             ln = self._n.shape[0]
             lw = self._wvl.shape[0]
@@ -136,7 +115,7 @@ class MultiLayer(object):
 
         self._im = self._lm = None
         self._matrix_TE = self._matrix_TM = None
-        self._coeffi_TE = self._coeffi_TE = None
+        self._coeffs_TE = self._coeffs_TM = None
 
     @property
     def d(self):
@@ -157,7 +136,7 @@ class MultiLayer(object):
 
         self._im = self._lm = None
         self._matrix_TE = self._matrix_TM = None
-        self._coeffi_TE = self._coeffi_TE = None
+        self._coeffs_TE = self._coeffs_TM = None
 
     @property
     def wvl(self):
@@ -176,7 +155,7 @@ class MultiLayer(object):
 
         self._im = self._lm = None
         self._matrix_TE = self._matrix_TM = None
-        self._coeffi_TE = self._coeffi_TE = None
+        self._coeffs_TE = self._coeffs_TM = None
 
     @property
     def aoi(self):
@@ -191,17 +170,7 @@ class MultiLayer(object):
 
         self._im = self._lm = None
         self._matrix_TE = self._matrix_TM = None
-        self._coeffi_TE = self._coeffi_TE = None
-
-    @property
-    def num_layers(self):
-        """Returns the number of layers."""
-        return self._d.shape[0]
-
-    @property
-    def num_lambda(self):
-        """Returns the number of wavelength values."""
-        return self._wvl.shape[0]
+        self._coeffs_TE = self._coeffs_TM = None
 
     @property
     def interface_matrices(self):
@@ -211,13 +180,13 @@ class MultiLayer(object):
         to the TE (s) and TM (p) polarizations.
         """
         # Make sure that the problem is well defined
-        assert self._d.shape[0] >= 2, "We need at least two layers (%i found)" % (self._d.shape[0])
-        assert self._n.shape[0] == self._wvl.shape[0],\
+        assert self.num_layers >= 2, "We need at least two layers (%i found)" % (self.num_layers)
+        assert self.num_lambda_n == self.num_lambda,\
             "The number of refractive index values (%i) does not match the number of wavelengths (%i)"\
-            % (self._n.shape[0], self._wvl.shape[0])
-        assert self._n.shape[1] == self._d.shape[0],\
+            % (self.num_lambda_n, self.num_lambda)
+        assert self.num_layers_n == self.num_layers,\
             "The number of refractive index values (%i) does not match the number of layers (%i)"\
-            % (self._n.shape[1], self._d.shape[0])
+            % (self.num_layers_n, self.num_layers)
 
         if self._im is None:
             n2 = self.n**2.0
@@ -229,7 +198,7 @@ class MultiLayer(object):
             qk = q[:, 1:]
 
             num1 = qj + qk
-            num2 = n2k*qj + n2j*qk
+            num2 = n2j*qk + n2k*qj
 
             self._im = np.zeros((self.num_lambda, self.num_layers - 1, 4), dtype=complex)
             # rjk for the TE (s) polarization
@@ -237,7 +206,7 @@ class MultiLayer(object):
             # tjk for the TE (s) polarization
             self._im[:, :, 1] = 2.0*qj/num1
             # rjk for the TM (p) polarization
-            self._im[:, :, 2] = (n2k*qj - n2j*qk)/num2
+            self._im[:, :, 2] = (n2j*qk - n2k*qj)/num2
             # tjk for the TM (p) polarization
             self._im[:, :, 3] = 2.0*self.n[:, :-1]*self.n[:, 1:]*qj/num2
 
@@ -251,13 +220,13 @@ class MultiLayer(object):
         exp(i*beta_j).
         """
         # Make sure that the problem is well defined
-        assert self._d.shape[0] >= 2, "We need at least two layers (%i found)" % (self._d.shape[0])
-        assert self._n.shape[0] == self._wvl.shape[0],\
+        assert self.num_layers >= 2, "We need at least two layers (%i found)" % (self.num_layers)
+        assert self.num_lambda_n == self.num_lambda,\
             "The number of refractive index values (%i) does not match the number of wavelengths (%i)"\
-            % (self._n.shape[0], self._wvl.shape[0])
-        assert self._n.shape[1] == self._d.shape[0],\
+            % (self.num_lambda_n, self.num_lambda)
+        assert self.num_layers_n == self.num_layers,\
             "The number of refractive index values (%i) does not match the number of layers (%i)"\
-            % (self._n.shape[1], self._d.shape[0])
+            % (self.num_layers_n, self.num_layers)
 
         if (self._lm is None) and (self.num_layers > 2):
             n2 = self.n**2.0
@@ -265,7 +234,7 @@ class MultiLayer(object):
             q = np.sqrt(n2 - (n2[:, 0]*self._sin2)[:, None])
             qj = q[:, 1:-1]
 
-            Bj = 2.0j*np.pi*qj*self.d[1:-1, None]/self.wvl[:, None]
+            Bj = 2.0j*np.pi*qj*self.d[1:-1]/self.wvl[:, None]
 
             self._lm = np.zeros((self.num_lambda, self.num_layers - 2, 2), dtype=complex)
             # exp(-i*beta_j)
@@ -275,35 +244,42 @@ class MultiLayer(object):
 
         return self._lm
 
+    def matrix(self, pol=TE):
+        im = self.interface_matrices
+
+        S = np.zeros((self.num_lambda, 2, 2), dtype=complex)
+
+        S[:, 0, 0] = S[:, 1, 1] = 1.0/im[:, 0, 2*pol + 1]
+        S[:, 0, 1] = S[:, 1, 0] = im[:, 0, 2*pol]/im[:, 0, 2*pol + 1]
+
+        if self.num_layers > 2:
+            lm = self.layer_matrices
+
+            B11 = lm[:, :, 0]/im[:, 1:, 2*pol + 1]
+            B12 = lm[:, :, 0]*im[:, 1:, 2*pol]/im[:, 1:, 2*pol + 1]
+            B21 = lm[:, :, 1]*im[:, 1:, 2*pol]/im[:, 1:, 2*pol + 1]
+            B22 = lm[:, :, 1]/im[:, 1:, 2*pol + 1]
+
+            for j in range(self.num_layers - 2):
+                C11 = S[:, 0, 0]*B11[:, j] + S[:, 0, 1]*B21[:, j]
+                C12 = S[:, 0, 0]*B12[:, j] + S[:, 0, 1]*B22[:, j]
+                C21 = S[:, 1, 0]*B11[:, j] + S[:, 1, 1]*B21[:, j]
+                C22 = S[:, 1, 0]*B12[:, j] + S[:, 1, 1]*B22[:, j]
+
+                S[:, 0, 0] = C11
+                S[:, 0, 1] = C12
+                S[:, 1, 0] = C21
+                S[:, 1, 1] = C22
+
+        return S
+
     @property
     def matrix_TE(self):
         """
         Calculate total TE matrix for the multilayer
         """
         if self._matrix_TE is None:
-            lm = self.layer_matrices
-            im = self.interface_matrices
-
-            self._matrix_TE = np.zeros((self.num_lambda, 2, 2), dtype=complex)
-
-            self._matrix_TE[:, 0, 0] = self._matrix_TE[:, 1, 1] = 1.0/im[:, 0, 1]
-            self._matrix_TE[:, 0, 1] = self._matrix_TE[:, 1, 0] = im[:, 0, 0]/im[:, 0, 1]
-
-            for j in range(1, self.num_layers - 1):
-                B11 = lm[:, j - 1, 0]/im[:, j, 1]
-                B12 = lm[:, j - 1, 0]*im[:, j, 0]/im[:, j, 1]
-                B21 = lm[:, j - 1, 1]*im[:, j, 0]/im[:, j, 1]
-                B22 = lm[:, j - 1, 1]/im[:, j, 1]
-
-                C11 = self._matrix_TE[:, 0, 0]*B11 + self._matrix_TE[:, 0, 1]*B21
-                C12 = self._matrix_TE[:, 0, 0]*B12 + self._matrix_TE[:, 0, 1]*B22
-                C21 = self._matrix_TE[:, 1, 0]*B11 + self._matrix_TE[:, 1, 1]*B21
-                C22 = self._matrix_TE[:, 1, 0]*B12 + self._matrix_TE[:, 1, 1]*B22
-
-                self._matrix_TE[:, 0, 0] = C11
-                self._matrix_TE[:, 0, 1] = C12
-                self._matrix_TE[:, 1, 0] = C21
-                self._matrix_TE[:, 1, 1] = C22
+            self._matrix_TE = self.matrix(pol=TE)
 
         return self._matrix_TE
 
@@ -313,29 +289,7 @@ class MultiLayer(object):
         Calculate total TM matrix for the multilayer
         """
         if self._matrix_TM is None:
-            lm = self.layer_matrices
-            im = self.interface_matrices
-
-            self._matrix_TM = np.zeros((self.num_lambda, 2, 2), dtype=complex)
-
-            self._matrix_TM[:, 0, 0] = self._matrix_TM[:, 1, 1] = 1.0/im[:, 0, 3]
-            self._matrix_TM[:, 0, 1] = self._matrix_TM[:, 1, 0] = im[:, 0, 2]/im[:, 0, 3]
-
-            for j in range(1, self.num_layers - 1):
-                B11 = lm[:, j - 1, 0]/im[:, j, 3]
-                B12 = lm[:, j - 1, 0]*im[:, j, 2]/im[:, j, 3]
-                B21 = lm[:, j - 1, 1]*im[:, j, 2]/im[:, j, 3]
-                B22 = lm[:, j - 1, 1]/im[:, j, 3]
-
-                C11 = self._matrix_TM[:, 0, 0]*B11 + self._matrix_TM[:, 0, 1]*B21
-                C12 = self._matrix_TM[:, 0, 0]*B12 + self._matrix_TM[:, 0, 1]*B22
-                C21 = self._matrix_TM[:, 1, 0]*B11 + self._matrix_TM[:, 1, 1]*B21
-                C22 = self._matrix_TM[:, 1, 0]*B12 + self._matrix_TM[:, 1, 1]*B22
-
-                self._matrix_TM[:, 0, 0] = C11
-                self._matrix_TM[:, 0, 1] = C12
-                self._matrix_TM[:, 1, 0] = C21
-                self._matrix_TM[:, 1, 1] = C22
+            self._matrix_TM = self.matrix(pol=TM)
 
         return self._matrix_TM
 
@@ -346,7 +300,6 @@ class MultiLayer(object):
         S = self.matrix_TE
         r = S[:, 1, 0]/S[:, 0, 0]
         t = 1.0/S[:, 0, 0]
-        #print r, t
 
         return r, t
 
@@ -359,4 +312,139 @@ class MultiLayer(object):
         t = 1.0/S[:, 0, 0]
 
         return r, t
+
+    def coeffs_matrix(self, layer, pol=TE):
+        im = self.interface_matrices
+        lm = self.layer_matrices
+
+        Sl = np.zeros((self.num_lambda, 2, 2), dtype=complex)
+        Sr = np.zeros((self.num_lambda, 2, 2), dtype=complex)
+
+        Sl[:, 0, 0] = Sl[:, 1, 1] = 1.0/im[:, 0, 2*pol + 1]
+        Sl[:, 0, 1] = Sl[:, 1, 0] = im[:, 0, 2*pol]/im[:, 0, 2*pol + 1]
+
+        Sr[:, 0, 0] = Sr[:, 1, 1] = 1.0/im[:, layer + 1, 2*pol + 1]
+        Sr[:, 0, 1] = Sr[:, 1, 0] = im[:, layer + 1, 2*pol]/im[:, layer + 1, 2*pol + 1]
+
+        B11 = lm[:, :, 0]/im[:, 1:, 2*pol + 1]
+        B12 = lm[:, :, 0]*im[:, 1:, 2*pol]/im[:, 1:, 2*pol + 1]
+        B21 = lm[:, :, 1]*im[:, 1:, 2*pol]/im[:, 1:, 2*pol + 1]
+        B22 = lm[:, :, 1]/im[:, 1:, 2*pol + 1]
+
+        for j in range(layer):
+            C11 = Sl[:, 0, 0]*B11[:, j] + Sl[:, 0, 1]*B21[:, j]
+            C12 = Sl[:, 0, 0]*B12[:, j] + Sl[:, 0, 1]*B22[:, j]
+            C21 = Sl[:, 1, 0]*B11[:, j] + Sl[:, 1, 1]*B21[:, j]
+            C22 = Sl[:, 1, 0]*B12[:, j] + Sl[:, 1, 1]*B22[:, j]
+
+            Sl[:, 0, 0] = C11
+            Sl[:, 0, 1] = C12
+            Sl[:, 1, 0] = C21
+            Sl[:, 1, 1] = C22
+
+        for j in range(layer + 1, self.num_layers - 2):
+            C11 = Sr[:, 0, 0]*B11[:, j] + Sr[:, 0, 1]*B21[:, j]
+            C12 = Sr[:, 0, 0]*B12[:, j] + Sr[:, 0, 1]*B22[:, j]
+            C21 = Sr[:, 1, 0]*B11[:, j] + Sr[:, 1, 1]*B21[:, j]
+            C22 = Sr[:, 1, 0]*B12[:, j] + Sr[:, 1, 1]*B22[:, j]
+
+            Sr[:, 0, 0] = C11
+            Sr[:, 0, 1] = C12
+            Sr[:, 1, 0] = C21
+            Sr[:, 1, 1] = C22
+
+        return Sl, Sr
+
+    def coefficients(self, pol=TE):
+        """
+        Calculate the field coefficients
+        """
+        n2 = self.n**2.0
+        qj = np.sqrt(n2[:, 1:-1] - (n2[:, 0]*self._sin2)[:, None])
+        Bj = 4.0j*np.pi*qj*self.d[1:-1]/self.wvl[:, None]
+
+        coeffs = np.zeros((self.num_lambda, self.num_layers, 2), dtype=complex)
+
+        # Define coefficients in the outer layers
+        if pol == TE:
+            r, t = self.rt_TE
+        else:
+            r, t = self.rt_TM
+
+        coeffs[:, 0, 0] = 1.0 + 0.0j
+        coeffs[:, 0, 1] = r
+        coeffs[:, -1, 0] = t
+        coeffs[:, -1, 1] = 0.0 + 0.0j
+        for j in range(self.num_layers - 2):
+            Sp, Spp = self.coeffs_matrix(layer=j, pol=pol)
+
+            coeffs[:, j + 1, 0] = 1.0/(Sp[:, 0, 0] + Sp[:, 0, 1]*Spp[:, 1, 0]*np.exp(Bj[:, j])/Spp[:, 0, 0])
+            coeffs[:, j + 1, 1] = coeffs[:, j + 1, 0]*Spp[:, 1, 0]*np.exp(Bj[:, j])/Spp[:, 0, 0]
+
+        return coeffs
+
+    @property
+    def coeffs_TE(self):
+        """
+        Calculate the field coefficients for the TE polarization
+        """
+        if self._coeffs_TE is None:
+            self._coeffs_TE = self.coefficients(pol=TE)
+
+        return self._coeffs_TE
+
+    @property
+    def coeffs_TM(self):
+        """
+        Calculate the field coefficients for the TM polarization
+        """
+        if self._coeffs_TM is None:
+            self._coeffs_TM = self.coefficients(pol=TM)
+
+        return self._coeffs_TM
+
+    def field(self, x, coeffs):
+        """Returns the electric field at specified values of x.
+
+        Inputs:
+          coeffs -- Array of field coefficients
+          x -- A 1D array of any length specifying the x values for which the field
+               should be returned. It must be sorted in increasing order.
+
+        Outputs: (E)
+          E -- an array of field values for the given x (complex-valued)
+        """    
+        xl = np.cumsum(self.d)
+        xl -= xl[0] # Just in case self.d[0] was not 0.0
+        xl[-1] = np.inf
+
+        n2 = self.n**2.0
+        qj = np.sqrt(n2 - (n2[:, 0]*self._sin2)[:, None])
+        Zeta = 2.0j*np.pi*qj/self.wvl[:, None]
+
+        E = np.zeros((self.num_lambda, len(x)), complex)
+        j = 0
+        for i, xi in enumerate(x):
+            while (xi > xl[j]):
+                j += 1
+            if (j == 0):
+                xj = xi
+            else:
+                xj = xi - xl[j - 1]
+
+            E[:, i] = coeffs[:, j, 0]*np.exp(Zeta[:, j]*xj) + coeffs[:, j, 1]*np.exp(-Zeta[:, j]*xj)
+
+        return E
+
+    def field_TE(self, x):
+        """
+        Calculate the electric field coefficients for the TE polarization
+        """
+        return self.field(x, self.coeffs_TE)
+
+    def field_TM(self, x):
+        """
+        Calculate the electric field coefficients for the TE polarization
+        """
+        return self.field(x, self.coeffs_TM)
 

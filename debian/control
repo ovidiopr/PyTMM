@@ -2,13 +2,13 @@ Source: python-tmmnlay
 Section: Science
 Priority: extra
 Maintainer: Ovidio Peña Rodríguez <ovidio@bytesfall.com>
-Build-Depends: debhelper (>=7.0.0), cython (>=0.23.4), python-numpy (>=1.0.3), python-scipy (>=0.5.2), dh-python, cdbs (>=0.4.49), python-all-dev, python-numpy-dev
+Build-Depends: debhelper (>=7.0.0), cython (>=0.23.4), python-numpy (>=1.0.3), dh-python, cdbs (>=0.4.49), python-all-dev, python-numpy-dev
 Standards-Version: 3.8.3
 Homepage: https://github.com/ovidiopr/tmmnlay
 
 Package: python-tmmnlay
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, python-numpy (>=1.0.3), python-scipy (>=0.5.2)
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, python-numpy (>=1.0.3)
 Description: Cython implementarion of the Transfer Matrix Method
  This extension implements the Transfer Matrix Method, which is
  used in optics and acoustics to analyze the propagation of
