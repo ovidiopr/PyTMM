@@ -1,11 +1,10 @@
 # tmmnlay
-Cython implementarion of the Transfer Matrix Method
+Cython implementation of the Transfer Matrix Method
 
 This extension implements the Transfer Matrix Method, which is
 used in optics and acoustics to analyze the propagation of
 electromagnetic or acoustic waves through a multilayer medium.
-For details of the implementatio, check the details of the
-[algorithm](https://github.com/ovidiopr/tmmnlay/wiki/Algorithm).
+For details of the implementation, check the [algorithm](https://github.com/ovidiopr/tmmnlay/wiki/Algorithm).
 
 ## Credits
 tmmnlay has been forked from [PyTMM](https://kitchenknif.github.io/PyTMM).
