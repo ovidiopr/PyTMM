@@ -34,12 +34,12 @@ TM = []
 a = MultiLayer(n=(1.0, n), d=(0.0, 0.0), wvl=l)
 for a.aoi in aoi:
     # TE
-    R, T = a.rt_TE
-    TE.append(np.abs(R**2))
+    r, t = a.rt_TE
+    TE.append(r.real*r.real + r.imag*r.imag)
 
     # TM
-    R, T = a.rt_TM
-    TM.append(np.abs(R**2))
+    r, t = a.rt_TM
+    TM.append(r.real*r.real + r.imag*r.imag)
 
 
 plt.plot(aoi, TE)

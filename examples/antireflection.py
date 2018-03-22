@@ -35,12 +35,12 @@ wavelength = np.linspace(200, 1600, 1401)
 # substrate layer
 a = MultiLayer(n=(1.0, n1), d=(0.0, 0.0), wvl=wavelength)
 r, t = a.rt_TE
-refl0 = np.abs(r**2)
+refl0 = r.real*r.real + r.imag*r.imag
 
-# antireflective layer layer "left" of substrate
+# antireflective layer "left" of substrate
 b = MultiLayer(n=(1.0, n2, n1), d=(0.0, d, 0.0), wvl=wavelength)
 r, t = b.rt_TE
-refl = np.abs(r**2)
+refl = r.real*r.real + r.imag*r.imag
 
 plt.plot(wavelength, refl0)
 plt.plot(wavelength, refl)

@@ -33,18 +33,18 @@ n = np.append(n, 1.0)
 d = np.tile(np.array((800.0/4./n1, 800.0/4.0/n2)), p)
 d = np.insert(d, 0, 0.0)
 d = np.append(d, 0.0)
-l = (673., 800.)
+l = (700., 800.)
 x = np.linspace(-1000., 5000., 4001)
 
-a = MultiLayer(n=n, d=d, wvl=l)
+a = MultiLayer(n=n, d=d, wvl=l, aoi=70.)
 
 # TE
 E = a.field_TE(x)
-TE = np.abs(E**2)
+TE = E.real*E.real + E.imag*E.imag
 
 # TM
 E = a.field_TM(x)
-TM = np.abs(E**2)
+TM = E.real*E.real + E.imag*E.imag
 
 legend = []
 for i, wvl in enumerate(l):

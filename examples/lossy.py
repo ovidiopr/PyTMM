@@ -26,19 +26,23 @@ import matplotlib.pyplot as plt
 
 from tmmnlay import MultiLayer
 
-wavelengths = np.linspace(200, 1500, 2000)
+wavelengths = np.linspace(200, 1600, 1401)
 
 a = MultiLayer(n=(1.0, 1.46, 1.0), d=(0.0, 200.0, 0.0), wvl=wavelengths)
-R0 = np.abs(a.rt_TE[0])**2
+r, t = a.rt_TE
+R0 = r.real*r.real + r.imag*r.imag
 
 a.n = (1.0, 1.46 + 0.001j, 1.0)
-R1 = np.abs(a.rt_TE[0])**2
+r, t = a.rt_TE
+R1 = r.real*r.real + r.imag*r.imag
 
 a.n = (1.0, 1.46 + 0.01j, 1.0)
-R2 = np.abs(a.rt_TE[0])**2
+r, t = a.rt_TE
+R2 = r.real*r.real + r.imag*r.imag
 
 a.n = (1.0, 1.46 + 0.1j, 1.0)
-R3 = np.abs(a.rt_TE[0])**2
+r, t = a.rt_TE
+R3 = r.real*r.real + r.imag*r.imag
 
 plt.plot(wavelengths, R0)
 plt.plot(wavelengths, R1)

@@ -33,17 +33,17 @@ n = np.append(n, 1.0)
 d = np.tile(np.array((800.0/4./n1, 800.0/4.0/n2)), p)
 d = np.insert(d, 0, 0.0)
 d = np.append(d, 0.0)
-l = np.linspace(600., 1200., 1201)
+l = np.linspace(500., 1000., 1001)
 
-a = MultiLayer(n=n, d=d, wvl=l)
+a = MultiLayer(n=n, d=d, wvl=l, aoi=70.)
 
 # TE
-R, T = a.rt_TE
-TE = np.abs(R**2)
+r, t = a.rt_TE
+TE = r.real*r.real + r.imag*r.imag
 
 # TM
-R, T = a.rt_TM
-TM = np.abs(R**2)
+r, t = a.rt_TM
+TM = r.real*r.real + r.imag*r.imag
 
 
 plt.plot(l, TE)

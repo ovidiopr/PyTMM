@@ -166,7 +166,6 @@ class MultiLayer(object):
     def aoi(self, value):
         """Updates the angle of incidence (degrees)."""
         self._aoi = value
-        self._sin2 = np.sin(self._aoi*np.pi/180.0)**2.0
 
         self._im = self._lm = None
         self._matrix_TE = self._matrix_TM = None
@@ -189,26 +188,27 @@ class MultiLayer(object):
             % (self.num_layers_n, self.num_layers)
 
         if self._im is None:
+            s2 = np.sin(self.aoi*np.pi/180.0)**2.0
             n2 = self.n**2.0
-            n2j = n2[:, :-1]
-            n2k = n2[:, 1:]
+            nj = self.n[:, :-1]
+            nk = self.n[:, 1:]
 
-            q = np.sqrt(n2 - (n2[:, 0]*self._sin2)[:, None])
-            qj = q[:, :-1]
-            qk = q[:, 1:]
+            c = np.sqrt(1.0 - (n2[:, 0]*s2)[:, None]/n2)
+            cj = c[:, :-1]
+            ck = c[:, 1:]
 
-            num1 = qj + qk
-            num2 = n2j*qk + n2k*qj
+            num1 = nj*cj + nk*ck
+            num2 = nk*cj + nj*ck
 
             self._im = np.zeros((self.num_lambda, self.num_layers - 1, 4), dtype=complex)
             # rjk for the TE (s) polarization
-            self._im[:, :, 0] = (qj - qk)/num1
+            self._im[:, :, 0] = (nj*cj - nk*ck)/num1
             # tjk for the TE (s) polarization
-            self._im[:, :, 1] = 2.0*qj/num1
+            self._im[:, :, 1] = 2.0*nj*cj/num1
             # rjk for the TM (p) polarization
-            self._im[:, :, 2] = (n2j*qk - n2k*qj)/num2
+            self._im[:, :, 2] = (nk*cj - nj*ck)/num2
             # tjk for the TM (p) polarization
-            self._im[:, :, 3] = 2.0*self.n[:, :-1]*self.n[:, 1:]*qj/num2
+            self._im[:, :, 3] = 2.0*nj*cj/num2
 
         return self._im
 
@@ -229,12 +229,12 @@ class MultiLayer(object):
             % (self.num_layers_n, self.num_layers)
 
         if (self._lm is None) and (self.num_layers > 2):
+            s2 = np.sin(self.aoi*np.pi/180.0)**2.0
             n2 = self.n**2.0
 
-            q = np.sqrt(n2 - (n2[:, 0]*self._sin2)[:, None])
-            qj = q[:, 1:-1]
+            kj = np.sqrt(n2[:, 1:-1] - (n2[:, 0]*s2)[:, None])*self.d[1:-1]
 
-            Bj = 2.0j*np.pi*qj*self.d[1:-1]/self.wvl[:, None]
+            Bj = 2.0j*np.pi*kj/self.wvl[:, None]
 
             self._lm = np.zeros((self.num_lambda, self.num_layers - 2, 2), dtype=complex)
             # exp(-i*beta_j)
@@ -359,22 +359,13 @@ class MultiLayer(object):
         """
         Calculate the field coefficients
         """
+        s2 = np.sin(self.aoi*np.pi/180.0)**2.0
         n2 = self.n**2.0
-        qj = np.sqrt(n2[:, 1:-1] - (n2[:, 0]*self._sin2)[:, None])
+        qj = np.sqrt(n2[:, 1:-1] - (n2[:, 0]*s2)[:, None])
         Bj = 4.0j*np.pi*qj*self.d[1:-1]/self.wvl[:, None]
 
         coeffs = np.zeros((self.num_lambda, self.num_layers, 2), dtype=complex)
 
-        # Define coefficients in the outer layers
-        if pol == TE:
-            r, t = self.rt_TE
-        else:
-            r, t = self.rt_TM
-
-        coeffs[:, 0, 0] = 1.0 + 0.0j
-        coeffs[:, 0, 1] = r
-        coeffs[:, -1, 0] = t
-        coeffs[:, -1, 1] = 0.0 + 0.0j
         for j in range(self.num_layers - 2):
             Sp, Spp = self.coeffs_matrix(layer=j, pol=pol)
 
@@ -391,6 +382,13 @@ class MultiLayer(object):
         if self._coeffs_TE is None:
             self._coeffs_TE = self.coefficients(pol=TE)
 
+            # Define coefficients in the outer layers
+            r, t = self.rt_TE
+            self._coeffs_TE[:, 0, 0] = 1.0 + 0.0j
+            self._coeffs_TE[:, 0, 1] = r
+            self._coeffs_TE[:, -1, 0] = t
+            self._coeffs_TE[:, -1, 1] = 0.0 + 0.0j
+
         return self._coeffs_TE
 
     @property
@@ -400,6 +398,17 @@ class MultiLayer(object):
         """
         if self._coeffs_TM is None:
             self._coeffs_TM = self.coefficients(pol=TM)
+
+            # Define coefficients in the outer layers
+            r, t = self.rt_TM
+            self._coeffs_TM[:, 0, 0] = 1.0 + 0.0j
+            self._coeffs_TM[:, 0, 1] = r
+            self._coeffs_TM[:, -1, 0] = t
+            self._coeffs_TM[:, -1, 1] = 0.0 + 0.0j
+
+            # Correct the TM coefficients to ensure continuity
+            self._coeffs_TM[:, :, 0] *= self.n
+            self._coeffs_TM[:, :, 1] *= self.n
 
         return self._coeffs_TM
 
@@ -418,9 +427,9 @@ class MultiLayer(object):
         xl -= xl[0] # Just in case self.d[0] was not 0.0
         xl[-1] = np.inf
 
+        s2 = np.sin(self.aoi*np.pi/180.0)**2.0
         n2 = self.n**2.0
-        qj = np.sqrt(n2 - (n2[:, 0]*self._sin2)[:, None])
-        Zeta = 2.0j*np.pi*qj/self.wvl[:, None]
+        Zeta = 2.0j*np.pi*np.sqrt(n2 - (n2[:, 0]*s2)[:, None])/self.wvl[:, None]
 
         E = np.zeros((self.num_lambda, len(x)), complex)
         j = 0

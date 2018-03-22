@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 #
-#    Copyright (C) 2014-2015 Pavel Dmitriev <pavel.a.dmitriev@gmail.com>
 #    Copyright (C) 2018 Ovidio Peña Rodríguez <ovidio@bytesfall.com>
 #
 #    This file is part of tmmnlay
-#
-#    tmmnlay was forked from PyTMM, which was developed by Pavel Dmitriev
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -26,27 +23,32 @@ import matplotlib.pyplot as plt
 
 from tmmnlay import MultiLayer
 
-n = 2.0
+n = 1.5
 d = 600  # slab thickness, nm
-l = 500  # wavelength, nm
+l = np.linspace(400., 1000., 601)  # wavelength, nm
 aoi = np.linspace(0, 89.9, 1000)
-TE = []
-TM = []
+
 a = MultiLayer(n=(1.0, n, 1.0), d=(0.0, d, 0.0), wvl=l)
-for a.aoi in aoi:
+
+legend = []
+for a.aoi in (70., 75.):
     # TE
-    R, T = a.rt_TE
-    TE.append(np.abs(R**2))
-
+    rs, ts = a.rt_TE
     # TM
-    R, T = a.rt_TM
-    TM.append(np.abs(R**2))
+    rp, tp = a.rt_TM
 
+    rho = rp/rs
 
-plt.plot(aoi, TE)
-plt.plot(aoi, TM)
-plt.xlabel("Angle, deg")
-plt.ylabel("Reflectance")
-plt.title("Angle dependence of reflectivity")
-plt.legend(['TE', 'TM'], loc='best')
+    psi = np.arctan(np.abs(rho))*180./np.pi
+    delta = np.angle(rho)*180./np.pi
+
+    plt.plot(l, psi)
+    legend += ['Psi(%.1f deg)' % (a.aoi)]
+    plt.plot(l, delta)
+    legend += ['Delta(%.1f deg)' % (a.aoi)]
+
+plt.xlabel("Wavelength, nm")
+plt.ylabel("Psi & Delta, deg")
+plt.title("Ellepsometric spectra")
+plt.legend(legend, loc='best')
 plt.show(block=True)
