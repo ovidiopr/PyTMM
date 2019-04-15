@@ -33,7 +33,7 @@ n = np.append(n, 1.0)
 d = np.tile(np.array((800.0/4./n1, 800.0/4.0/n2)), p)
 d = np.insert(d, 0, 0.0)
 d = np.append(d, 0.0)
-l = (700., 800.)
+l = (700., 773., 872.48)
 x = np.linspace(-1000., 5000., 4001)
 
 a = MultiLayer(n=n, d=d, wvl=l, aoi=70.)
