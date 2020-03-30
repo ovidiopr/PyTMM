@@ -198,7 +198,7 @@ class MultiLayer(object):
             ck = c[:, 1:]
 
             num1 = nj*cj + nk*ck
-            num2 = nk*cj + nj*ck
+            num2 = nj*ck + nk*cj
 
             self._im = np.zeros((self.num_lambda, self.num_layers - 1, 4), dtype=complex)
             # rjk for the TE (s) polarization
@@ -206,7 +206,7 @@ class MultiLayer(object):
             # tjk for the TE (s) polarization
             self._im[:, :, 1] = 2.0*nj*cj/num1
             # rjk for the TM (p) polarization
-            self._im[:, :, 2] = (nk*cj - nj*ck)/num2
+            self._im[:, :, 2] = (nj*ck - nk*cj)/num2
             # tjk for the TM (p) polarization
             self._im[:, :, 3] = 2.0*nj*cj/num2
 
