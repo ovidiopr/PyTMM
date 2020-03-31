@@ -31,7 +31,7 @@ aoi = np.linspace(0, 89.9, 1000)
 a = MultiLayer(n=(1.0, n, 1.0), d=(0.0, d, 0.0), wvl=l)
 
 legend = []
-for a.aoi in (70., 75.):
+for a.aoi in (70., 75., 80.):
     # TE
     rs, ts = a.rt_TE
     # TM
@@ -39,16 +39,16 @@ for a.aoi in (70., 75.):
 
     rho = rp/rs
 
-    psi = np.arctan(np.abs(rho))*180./np.pi
-    delta = np.angle(rho)*180./np.pi
+    tan_psi = np.abs(rho)
+    cos_delta = np.cos(np.angle(rho))
 
-    plt.plot(l, psi)
-    legend += ['Psi(%.1f deg)' % (a.aoi)]
-    plt.plot(l, delta)
-    legend += ['Delta(%.1f deg)' % (a.aoi)]
+    plt.plot(l, tan_psi)
+    legend += ['tan($\\Psi$) ($\\theta_{i}$ = %.1f deg)' % (a.aoi)]
+    plt.plot(l, cos_delta)
+    legend += ['cos($\\Delta$) ($\\theta_{i}$ = %.1f deg)' % (a.aoi)]
 
 plt.xlabel("Wavelength, nm")
-plt.ylabel("Psi & Delta, deg")
-plt.title("Ellepsometric spectra")
+plt.ylabel("tan($\\Psi$) & cos($\\Delta$)")
+plt.title("Ellipsometric spectra")
 plt.legend(legend, loc='best')
 plt.show(block=True)
