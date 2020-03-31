@@ -72,40 +72,66 @@ class MultiLayer(object):
             "The number of refractive index values (%i) does not match the number of layers (%i)"\
             % (self.num_layers_n, self.num_layers)
 
+    def reset(self):
+        """
+        Reset the calculations
+        """
+        self._im = self._lm = None
+        self._matrix_TE = self._matrix_TM = None
+        self._coeffs_TE = self._coeffs_TM = None
+
+    def get_array(self, value):
+        """
+        Force the input value to be a NumPy array
+        """
+        if type(value) is np.ndarray:
+            return value
+        elif type(value) in (int, float, complex):
+            return np.array([value])
+        else:
+            return np.array(value)
+
     @property
     def num_layers(self):
-        """Returns the number of layers."""
+        """
+        Returns the number of layers
+        """
         return self._d.shape[0]
 
     @property
     def num_lambda(self):
-        """Returns the number of wavelength values."""
+        """
+        Returns the number of wavelength values
+        """
         return self._wvl.shape[0]
 
     @property
     def num_layers_n(self):
-        """Returns the number of layers."""
+        """
+        Returns the number of layers
+        """
         return self._n.shape[1]
 
     @property
     def num_lambda_n(self):
-        """Returns the number of wavelength values."""
+        """
+        Returns the number of wavelength values
+        """
         return self._n.shape[0]
 
     @property
     def n(self):
-        """Returns the refractive index values."""
+        """
+        Returns the refractive index values
+        """
         return self._n
 
     @n.setter
     def n(self, value):
-        """Updates the refractive index values."""
-        if type(value) is np.ndarray:
-            self._n = value
-        elif type(value) in (int, float, complex):
-            self._n = np.array([value])
-        else:
-            self._n = np.array(value)
+        """
+        Updates the refractive index values
+        """
+        self._n = self.get_array(value)
 
         # If n is an 1D array we repeat the values for all wavelengths
         if len(self._n.shape) == 1:
@@ -113,63 +139,58 @@ class MultiLayer(object):
             lw = self._wvl.shape[0]
             self._n = np.tile(self._n, lw).reshape((lw, ln))
 
-        self._im = self._lm = None
-        self._matrix_TE = self._matrix_TM = None
-        self._coeffs_TE = self._coeffs_TM = None
+        self.reset()
 
     @property
     def d(self):
-        """Returns the thickness values."""
+        """
+        Returns the thickness values
+        """
         return self._d
 
     @d.setter
     def d(self, value):
-        """Updates the thickness values."""
-        if type(value) is np.ndarray:
-            self._d = value
-        elif type(value) in (int, float, complex):
-            self._d = np.array([value])
-        else:
-            self._d = np.array(value)
+        """
+        Updates the thickness values
+        """
+        self._d = self.get_array(value)
+
         # Enforce this requirement for the outer layers
         self._d[0] = self._d[-1] = 0.0
 
-        self._im = self._lm = None
-        self._matrix_TE = self._matrix_TM = None
-        self._coeffs_TE = self._coeffs_TM = None
+        self.reset()
 
     @property
     def wvl(self):
-        """Returns the wavelength values."""
+        """
+        Returns the wavelength values
+        """
         return self._wvl
 
     @wvl.setter
     def wvl(self, value):
-        """Updates wavelength values."""
-        if type(value) is np.ndarray:
-            self._wvl = value
-        elif type(value) in (int, float, complex):
-            self._wvl = np.array([value])
-        else:
-            self._wvl = np.array(value)
+        """
+        Updates wavelength values
+        """
+        self._wvl = self.get_array(value)
 
-        self._im = self._lm = None
-        self._matrix_TE = self._matrix_TM = None
-        self._coeffs_TE = self._coeffs_TM = None
+        self.reset()
 
     @property
     def aoi(self):
-        """Returns the angle of incidence (degrees)."""
+        """
+        Returns the angle of incidence (degrees)
+        """
         return self._aoi
 
     @aoi.setter
     def aoi(self, value):
-        """Updates the angle of incidence (degrees)."""
+        """
+        Updates the angle of incidence (degrees)
+        """
         self._aoi = value
 
-        self._im = self._lm = None
-        self._matrix_TE = self._matrix_TM = None
-        self._coeffs_TE = self._coeffs_TM = None
+        self.reset()
 
     @property
     def interface_matrices(self):
@@ -188,12 +209,12 @@ class MultiLayer(object):
             % (self.num_layers_n, self.num_layers)
 
         if self._im is None:
-            s2 = np.sin(self.aoi*np.pi/180.0)**2.0
             n2 = self.n**2.0
             nj = self.n[:, :-1]
             nk = self.n[:, 1:]
 
-            c = np.sqrt(1.0 - (n2[:, 0]*s2)[:, None]/n2)
+            s2 = (n2[:, 0]*np.sin(self.aoi*np.pi/180.0)**2.0)[:, None]/n2
+            c = np.sqrt(1.0 - s2)
             cj = c[:, :-1]
             ck = c[:, 1:]
 
@@ -208,7 +229,7 @@ class MultiLayer(object):
             # rjk for the TM (p) polarization
             self._im[:, :, 2] = (nj*ck - nk*cj)/num2
             # tjk for the TM (p) polarization
-            self._im[:, :, 3] = 2.0*nj*cj/num2
+            self._im[:, :, 3] = 2.0*nj*ck/num2
 
         return self._im
 
@@ -245,6 +266,9 @@ class MultiLayer(object):
         return self._lm
 
     def matrix(self, pol=TE):
+        """
+        Calculate total matrix for the multilayer.
+        """
         im = self.interface_matrices
 
         S = np.zeros((self.num_lambda, 2, 2), dtype=complex)
@@ -276,7 +300,7 @@ class MultiLayer(object):
     @property
     def matrix_TE(self):
         """
-        Calculate total TE matrix for the multilayer
+        Calculate total TE matrix for the multilayer.
         """
         if self._matrix_TE is None:
             self._matrix_TE = self.matrix(pol=TE)
@@ -286,30 +310,46 @@ class MultiLayer(object):
     @property
     def matrix_TM(self):
         """
-        Calculate total TM matrix for the multilayer
+        Calculate total TM matrix for the multilayer.
         """
         if self._matrix_TM is None:
             self._matrix_TM = self.matrix(pol=TM)
 
         return self._matrix_TM
 
-    @property
-    def rt_TE(self):
+    def rt(self, pol=TE):
         """
+        Calculate total Fresnel reflection and transmission coefficients for the multilayer
         """
-        S = self.matrix_TE
+        S = self.matrix(pol=pol)
         r = S[:, 1, 0]/S[:, 0, 0]
         t = 1.0/S[:, 0, 0]
 
         return r, t
 
     @property
+    def rt_TE(self):
+        """
+        Calculate TE Fresnel reflection and transmission coefficients for the multilayer
+        """
+        r, t = self.rt(pol=TE)
+
+        #Apply correction for total internal reflection
+        r[np.isnan(r)] = 1.0
+        t[np.isnan(t)] = 2.0
+
+        return r, t
+
+    @property
     def rt_TM(self):
         """
+        Calculate TM Fresnel reflection and transmission coefficients for the multilayer
         """
-        S = self.matrix_TM
-        r = S[:, 1, 0]/S[:, 0, 0]
-        t = 1.0/S[:, 0, 0]
+        r, t = self.rt(pol=TM)
+
+        #Apply correction for total internal reflection
+        r[np.isnan(r)] = -1.0
+        t[np.isnan(t)] = 0.0
 
         return r, t
 
@@ -372,6 +412,13 @@ class MultiLayer(object):
             coeffs[:, j + 1, 0] = 1.0/(Sp[:, 0, 0] + Sp[:, 0, 1]*Spp[:, 1, 0]*np.exp(Bj[:, j])/Spp[:, 0, 0])
             coeffs[:, j + 1, 1] = coeffs[:, j + 1, 0]*Spp[:, 1, 0]*np.exp(Bj[:, j])/Spp[:, 0, 0]
 
+        #Define coefficients in the outer layers
+        r, t = self.rt(pol=pol)
+        coeffs[:, 0, 0] = 1.0 + 0.0j
+        coeffs[:, 0, 1] = r
+        coeffs[:, -1, 0] = t
+        coeffs[:, -1, 1] = 0.0 + 0.0j
+
         return coeffs
 
     @property
@@ -381,13 +428,6 @@ class MultiLayer(object):
         """
         if self._coeffs_TE is None:
             self._coeffs_TE = self.coefficients(pol=TE)
-
-            # Define coefficients in the outer layers
-            r, t = self.rt_TE
-            self._coeffs_TE[:, 0, 0] = 1.0 + 0.0j
-            self._coeffs_TE[:, 0, 1] = r
-            self._coeffs_TE[:, -1, 0] = t
-            self._coeffs_TE[:, -1, 1] = 0.0 + 0.0j
 
         return self._coeffs_TE
 
@@ -399,21 +439,11 @@ class MultiLayer(object):
         if self._coeffs_TM is None:
             self._coeffs_TM = self.coefficients(pol=TM)
 
-            # Define coefficients in the outer layers
-            r, t = self.rt_TM
-            self._coeffs_TM[:, 0, 0] = 1.0 + 0.0j
-            self._coeffs_TM[:, 0, 1] = r
-            self._coeffs_TM[:, -1, 0] = t
-            self._coeffs_TM[:, -1, 1] = 0.0 + 0.0j
-
-            # Correct the TM coefficients to ensure continuity
-            self._coeffs_TM[:, :, 0] *= self.n
-            self._coeffs_TM[:, :, 1] *= self.n
-
         return self._coeffs_TM
 
     def field(self, x, coeffs):
-        """Returns the electric field at specified values of x.
+        """
+        Returns the electric field at specified values of x.
 
         Inputs:
           coeffs -- Array of field coefficients

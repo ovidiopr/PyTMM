@@ -30,7 +30,7 @@ aoi = np.linspace(0, 89.9, 1000)
 TE = []
 TM = []
 # Wavelength is not important if both layers are seminfinite
-a = MultiLayer(n=(1.0, 2.0), d=(0.0, 0.0), wvl=1)
+a = MultiLayer(n=(2.0, 1.0), d=(0.0, 0.0), wvl=1)
 for a.aoi in aoi:
     # TE
     r, t = a.rt_TE
